@@ -6,13 +6,13 @@
 #include <windows.h>
 #include <detours.h>
 #include <stdio.h>
+#include <string>
 
 int main(int argc, char* argv[])
 {
 	if (argc == 1)
 	{
-		MessageBox(GetForegroundWindow(), "MyRunas只是一个外壳，在启动runas时修改了它的某些代码，使其支持自动输入密码，其中密码是在MyRunas.ini文件中设置的，除此之外MyRunas用法和runas命令完全相同。"
-			"在XP、Win7、Win2008下测试通过。\n\nMyRunas v1.0 2014/3\nby YangFan\nEmail:522419441@qq.com", "MyRunas", MB_ICONINFORMATION);
+		printf("RunasPW的命令参数和系统的runas是一致的，只是可以使用/password:xxx来指定密码\n");
 		return -1;
 	}
 
@@ -23,11 +23,51 @@ int main(int argc, char* argv[])
 	memset(&si, 0, sizeof(si));
 	memset(&pi, 0, sizeof(pi));
 
+	std::string cmdLine = GetCommandLine();
+	std::string cmdLineNew = cmdLine;
+	std::string password;
+	size_t idx = cmdLine.find("/password:");
+	if (idx != std::string::npos)
+	{
+		//"/password:xxx"这种情况
+		bool bDouhao = false;
+		if (cmdLine[idx - 1] == '\"')
+		{
+			idx -= 1;
+			bDouhao = true;
+		}
+		
+		size_t idxEnd = cmdLine.find(' ', idx + 1);
+		if (idxEnd != std::string::npos)
+		{
+			//删除命令行中的密码段
+			cmdLineNew = cmdLine.substr(0, idx) + cmdLine.substr(idxEnd + 1);
+
+			std::string passwordCmdLine = cmdLine.substr(idx, idxEnd - idx);
+			size_t idxPass = passwordCmdLine.find(':');
+			password = passwordCmdLine.substr(idxPass + 1);
+			if (password.size() > 0)
+			{
+				if (bDouhao)// "/password:xxx"
+				{
+					password.pop_back();
+				}
+				else if (password[0] == '"' && password.size() > 1)// /password:"xxx"
+				{
+					password = password.substr(1, password.size() - 2);
+				}
+			}
+		}
+
+	}
+
 	char szMyRunasCMDLine[1024] = { 0 };
 	char szRunasCMDLine[1024] = { 0 };
-	strcpy(szMyRunasCMDLine, GetCommandLine());
+	strcpy(szMyRunasCMDLine, cmdLineNew.c_str());
 	strcpy(szRunasCMDLine, "runas ");
 	strcat(szRunasCMDLine, strstr(szMyRunasCMDLine + strlen(__argv[0]), __argv[1]));
+
+	std::string env = "password=" + password;//把密码放到环境变量中
 
 	char szDLL[MAX_PATH] = { 0 };
 	GetModuleFileName(NULL, szDLL, 1024);
@@ -40,7 +80,7 @@ int main(int argc, char* argv[])
 		NULL,           // Thread handle not inheritable
 		FALSE,          // Set handle inheritance to FALSE
 		0,              // No creation flags
-		NULL,           // Use parent's environment block
+		(LPVOID)env.c_str(),// Use parent's environment block
 		NULL,           // Use parent's starting directory 
 		&si,            // Pointer to STARTUPINFO structure
 		&pi,

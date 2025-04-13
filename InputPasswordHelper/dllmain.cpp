@@ -5,6 +5,7 @@
 #include "pch.h"
 #include <detours.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 typedef BOOL(WINAPI* pfnReadConsole)(
 	__in          HANDLE hConsoleInput,
@@ -13,7 +14,6 @@ typedef BOOL(WINAPI* pfnReadConsole)(
 	__out         LPDWORD lpNumberOfCharsRead,
 	__in_opt      LPVOID pInputControl
 	);
-
 
 typedef BOOL(WINAPI* pfnCreateProcessWithLogonW)(
 	__in          LPCWSTR lpUsername,
@@ -29,9 +29,6 @@ typedef BOOL(WINAPI* pfnCreateProcessWithLogonW)(
 	__out         LPPROCESS_INFORMATION lpProcessInfo
 	);
 
-
-
-
 BOOL WINAPI MyReadConsole(
 	__in          HANDLE hConsoleInput,
 	__out         LPVOID lpBuffer,
@@ -39,7 +36,6 @@ BOOL WINAPI MyReadConsole(
 	__out         LPDWORD lpNumberOfCharsRead,
 	__in_opt      LPVOID pInputControl
 );
-
 
 BOOL WINAPI MyCreateProcessWithLogonW(
 	__in          LPCWSTR lpUsername,
@@ -60,9 +56,7 @@ BOOL MByteToWChar(LPCSTR lpcszStr, LPWSTR lpwszStr, DWORD dwSize);
 pfnReadConsole realReadConsole = (pfnReadConsole)GetProcAddress(LoadLibrary("Kernel32.dll"), "ReadConsoleW");
 pfnCreateProcessWithLogonW realCreateProcessWithLogonW = (pfnCreateProcessWithLogonW)GetProcAddress(LoadLibrary("Advapi32.dll"), "CreateProcessWithLogonW");
 
-
 HANDLE g_hDLL = NULL;
-
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -107,11 +101,15 @@ BOOL WINAPI MyReadConsole(
 	__in_opt      LPVOID pInputControl
 )
 {
+	//MessageBox(0, "", "", 0);
 	*((char*)lpBuffer) = 0x0d;
 	*lpNumberOfCharsRead = 1;
 	return FALSE;
-}
 
+	//继续则
+	//*((char*)lpBuffer) != 0x0d;
+	//return TRUE;
+}
 
 BOOL WINAPI MyCreateProcessWithLogonW(
 	__in          LPCWSTR lpUsername,
@@ -127,23 +125,13 @@ BOOL WINAPI MyCreateProcessWithLogonW(
 	__out         LPPROCESS_INFORMATION lpProcessInfo
 )
 {
+	//MessageBox(0, "", "", 0);
 
 	WCHAR wcsPassword[128] = { 0 };
-	char szPassword[128] = { 0 };
-	char szIniFile[MAX_PATH] = { 0 };
-
-	GetModuleFileName((HMODULE)g_hDLL, szIniFile, MAX_PATH);
-	strcpy(strrchr(szIniFile, '\\') + 1, "MyRunas.ini");
-	GetPrivateProfileString("Setting", "password", "", szPassword, 128, szIniFile);
-
-	if (!strlen(szPassword))
+	const char* password = ::getenv("password");//从环境变量中获取密码
+	if (password)
 	{
-		printf("读取密码文件%s失败，请检查设置是否正确!\n", szIniFile);
-		MessageBox(NULL, "读取密码文件失败，请检查设置是否正确!", "", NULL);
-	}
-	else
-	{
-		MByteToWChar(szPassword, wcsPassword, sizeof(wcsPassword) / sizeof(wcsPassword[0]));
+		MByteToWChar(password, wcsPassword, sizeof(wcsPassword) / sizeof(wcsPassword[0]));
 	}
 
 	return realCreateProcessWithLogonW(lpUsername,
@@ -158,7 +146,6 @@ BOOL WINAPI MyCreateProcessWithLogonW(
 		lpStartupInfo,
 		lpProcessInfo);
 }
-
 
 BOOL MByteToWChar(LPCSTR lpcszStr, LPWSTR lpwszStr, DWORD dwSize)
 {
