@@ -12,7 +12,10 @@ int main(int argc, char* argv[])
 {
 	if (argc == 1)
 	{
-		printf("RunasPW的命令参数和系统的runas是一致的，只是可以使用/password:xxx来指定密码\n");
+		printf(
+			"RunasPW的命令参数和系统的runas是一致的，只是可以使用/password:xxx来指定密码\n"
+			"示例: RunasPW /noprofile /user:用户名 /password:密码 cmd\n"
+		);
 		return -1;
 	}
 
